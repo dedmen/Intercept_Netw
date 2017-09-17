@@ -1,0 +1,9 @@
+.vs
+/zeromqcli/zeromqcli/x64
+/zeromqcli/zeromqcli/Debug
+/zeromqsrv/zeromqsrv/Debug
+/zeromqsrv/zeromqsrv/x64
+
+*.iobj
+
+*.ipdb
