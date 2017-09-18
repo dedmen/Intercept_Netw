@@ -97,17 +97,17 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>I:\Intercept_Networking\zeromq-4.2.2\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\projects\Intercept_Netw\zeromq-4.2.2\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>I:\Intercept_Networking\zeromq-4.2.2build\lib\Debug</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>E:\projects\Intercept_Netw\zeromq-4.2.2build\lib\Debug</AdditionalLibraryDirectories>
       <AdditionalDependencies>libzmq-v141-mt-gd-4_2_2.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
