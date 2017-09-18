@@ -6,6 +6,7 @@
 //
 
 #include "router.h"
+#include <thread>
 
 //  We'd normally pull these from config data
 
@@ -429,6 +430,7 @@ int main(int argc, char *argv[]) {
 
     router rt;
     rt.bind("tcp://127.0.0.1:5555");
+    //std::thread ([&rt](){rt.route();}).detach();
     rt.route();
 
     //broker brk(1);

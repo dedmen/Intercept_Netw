@@ -6,8 +6,8 @@
 #include <list>
 #include <deque>
 #include <memory>
-
-
+#include <chrono>
+using namespace std::chrono_literals;
 
 
 
@@ -47,17 +47,17 @@ And when we deserialize we actually don't know what we are even deserializing...
  */
 
 #define HEARTBEAT_LIVENESS  3       //  3-5 is reasonable
-#define HEARTBEAT_INTERVAL  2500    //  msecs
+#define HEARTBEAT_INTERVAL  2500ms    //  msecs
 #define HEARTBEAT_EXPIRY    HEARTBEAT_INTERVAL * HEARTBEAT_LIVENESS
 class service;
 class client {
 public:
     std::string m_identity;   //  Address of worker
     std::shared_ptr<service>  m_service;      //  Owning service, if known
-    int64_t m_expiry;         //  Expires at unless heartbeat
+    std::chrono::system_clock::time_point m_expiry;         //  Expires at unless heartbeat
     std::string cid;
 
-    client(std::string identity, std::shared_ptr<service>  service = 0, int64_t expiry = 0) {
+    client(std::string identity, std::shared_ptr<service>  service = 0, std::chrono::system_clock::time_point expiry = {}) {
         m_identity = identity;
         m_service = service;
         m_expiry = expiry;
@@ -108,18 +108,18 @@ public:
 
     void
         purge_workers() {
-        std::deque<std::shared_ptr<client>> toCull;
-        int64_t now = s_clock();
-        for (std::set<std::shared_ptr<client>>::iterator wrk = m_waiting.begin(); wrk != m_waiting.end(); ++wrk) {
-            if ((*wrk)->m_expiry <= now)
-                toCull.push_back(*wrk);
+        std::vector<std::shared_ptr<client>> toCull;
+        std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+        for (auto& worker : m_clients) {
+            if (worker.second->m_expiry <= now)
+                toCull.push_back(worker.second);
         }
-        for (std::deque<std::shared_ptr<client>>::iterator wrk = toCull.begin(); wrk != toCull.end(); ++wrk) {
+        for (auto& worker : toCull) {
             if (m_verbose) {
                 s_console("I: deleting expired worker: %s",
-                    (*wrk)->m_identity.c_str());
+                    worker->m_identity.c_str());
             }
-            worker_delete(*wrk, 0);
+            worker_delete(worker, 0);
         }
     }
 
@@ -146,8 +146,7 @@ public:
     //  ---------------------------------------------------------------------
     //  Dispatch requests to waiting workers as possible
 
-    void
-        service_dispatch(std::shared_ptr<service> srv, std::shared_ptr<zmsg> msg) {
+    void service_dispatch(std::shared_ptr<service> srv, std::shared_ptr<zmsg> msg) {
         assert(srv);
         if (msg) {                    //  Queue message if any
             srv->m_requests.push_back(msg);
@@ -166,7 +165,6 @@ public:
             std::shared_ptr<zmsg> msg = srv->m_requests.front();
             srv->m_requests.pop_front();
             worker_send(*wrk, (char*) MDPW_REQUEST, "", msg);
-            m_waiting.erase(*wrk);
             srv->m_waiting.erase(wrk);
         }
     }
@@ -174,8 +172,9 @@ public:
     //  ---------------------------------------------------------------------
     //  Handle internal service according to 8/MMI specification
 
-    void
-        service_internal(std::string service_name, std::shared_ptr<zmsg> msg) {
+    void service_internal(std::string service_name, std::shared_ptr<zmsg> msg) {
+        //std::cerr << "service\n";
+        //msg->dump();
         if (service_name.compare("srv.service") == 0) {
             std::shared_ptr<service>  srv = m_services.at(msg->body());
             if (srv && srv->m_waiting.empty()) {
@@ -191,8 +190,11 @@ public:
         //  Remove & save client return envelope and insert the
         //  protocol header and service name, then rewrap envelope.
         std::string client = msg->unwrap();
-        msg->wrap(MDPC_CLIENT, service_name.c_str());
+        msg->wrap(MDPW_REQUEST, service_name.c_str());
+        msg->push_front("");
         msg->wrap(client.c_str(), "");
+        //std::cerr << "serviceend\n";
+        //msg->dump();
         msg->send(*m_socket);
     }
 
@@ -227,7 +229,6 @@ public:
         if (wrk->m_service) {
             wrk->m_service->m_waiting.erase(wrk);
         }
-        m_waiting.erase(wrk);
         //  This implicitly calls the worker destructor
         m_clients.erase(wrk->m_identity);
     }
@@ -275,8 +276,9 @@ public:
                 }
             } else {
                 if (command.compare(MDPW_HEARTBEAT) == 0) {
+                    std::cerr << "pong\n";
                     if (worker_ready) {
-                        wrk->m_expiry = s_clock() + HEARTBEAT_EXPIRY;
+                        wrk->m_expiry = std::chrono::system_clock::now() + HEARTBEAT_EXPIRY;
                     } else {
                         worker_delete(wrk, 1);
                     }
@@ -322,9 +324,8 @@ public:
     void worker_waiting(std::shared_ptr<client> worker) {
         assert(worker);
         //  Queue to broker and service waiting lists
-        m_waiting.insert(worker);
         worker->m_service->m_waiting.insert(worker);
-        worker->m_expiry = s_clock() + HEARTBEAT_EXPIRY;
+        worker->m_expiry = std::chrono::system_clock::now() + HEARTBEAT_EXPIRY;
         // Attempt to process outstanding requests
         service_dispatch(worker->m_service, 0);
     }
@@ -355,22 +356,22 @@ public:
 
     //  Get and process messages forever or until interrupted
     void route() {
-        int64_t now = s_clock();
-        int64_t heartbeat_at = now + HEARTBEAT_INTERVAL;
+        std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+        std::chrono::system_clock::time_point heartbeat_at = now + HEARTBEAT_INTERVAL;
         while (!s_interrupted) {
             zmq::pollitem_t items[] = {
                 { *m_socket,  0, ZMQ_POLLIN, 0 } };
-            int64_t timeout = heartbeat_at - now;
-            if (timeout < 0)
-                timeout = 0;
-            zmq::poll(items, 1, (long) timeout);
+            std::chrono::milliseconds timeout = std::chrono::duration_cast<std::chrono::milliseconds>(heartbeat_at - now);
+            if (timeout < 0ms)
+                timeout = 0ms;
+            zmq::poll(items, 1, timeout);
 
             //  Process next input message, if any
             if (items[0].revents & ZMQ_POLLIN) {
                 std::shared_ptr<zmsg> msg = std::make_shared<zmsg>(*m_socket);
                 if (m_verbose) {
-                    s_console("I: received message:");
-                    msg->dump();
+                    //s_console("I: received message:");
+                    //msg->dump();
                 }
                 std::string sender = std::string((char*) msg->pop_front().c_str());
                 msg->pop_front(); //empty message
@@ -391,14 +392,17 @@ public:
             }
             //  Disconnect and delete any expired workers
             //  Send heartbeats to idle workers if needed
-            now = s_clock();
+            now = std::chrono::system_clock::now();
             if (now >= heartbeat_at) {
                 purge_workers();
-                for (auto& worker : m_waiting) {
-                    worker_send(worker, (char*) MDPW_HEARTBEAT, "", NULL);
+                m_verbose = false;
+                for (auto& worker : m_clients) {
+                    std::cerr << "ping\n";
+                    worker_send(worker.second, (char*) MDPW_HEARTBEAT, "", NULL);
                 }
+                m_verbose = true; 
                 heartbeat_at += HEARTBEAT_INTERVAL;
-                now = s_clock();
+                now = std::chrono::system_clock::now();
             }
         }
     }
@@ -411,7 +415,6 @@ public:
     std::string m_endpoint;                      //  Broker binds to this endpoint
     std::map<std::string, std::shared_ptr<service>> m_services;  //  Hash of known services
     std::map<std::string, std::shared_ptr<client>> m_clients;    //  Hash of known workers
-    std::set<std::shared_ptr<client>> m_waiting;              //  List of waiting workers
 };
 
 static router GRouter;
