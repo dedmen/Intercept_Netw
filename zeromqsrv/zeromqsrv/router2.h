@@ -326,7 +326,7 @@ public:
             //  Process next input message, if any
             if (!pollNext || items[0].revents & ZMQ_POLLIN) {
                 __itt_counter_inc(handle_recvCounter);
-                __itt_task_begin(domain, __itt_null, __itt_null, handle_pollWait);
+                __itt_task_begin(domain, __itt_null, __itt_null, handle_routeMessage);
                 std::shared_ptr<zmsg> msg = std::make_shared<zmsg>(*m_socket);
 
                 if (msg->parts() == 0) {
