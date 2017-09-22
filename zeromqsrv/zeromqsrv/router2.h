@@ -288,8 +288,10 @@ public:
         __itt_task_end(domain);
     }
     __itt_string_handle* handle_pollWait = __itt_string_handle_create("pollWait");
+    __itt_string_handle* handle_routeMessage = __itt_string_handle_create("routeMessage");
+    __itt_string_handle* handle_heartBeating = __itt_string_handle_create("heartBeating");
     __itt_counter handle_pollCounter = __itt_counter_create("poll","router2");
-    __itt_counter handle_recvCounter = __itt_counter_create("recv","router2");
+    __itt_counter handle_recvCounter = __itt_counter_create("recv", "router2");
     void route() {
         std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
         std::chrono::system_clock::time_point heartbeat_at = now + HEARTBEAT_INTERVAL;
@@ -324,6 +326,7 @@ public:
             //  Process next input message, if any
             if (!pollNext || items[0].revents & ZMQ_POLLIN) {
                 __itt_counter_inc(handle_recvCounter);
+                __itt_task_begin(domain, __itt_null, __itt_null, handle_pollWait);
                 std::shared_ptr<zmsg> msg = std::make_shared<zmsg>(*m_socket);
 
                 if (msg->parts() == 0) {
@@ -366,10 +369,11 @@ public:
                     msg->dump();
                 }
                 messageCounter++;
+                __itt_task_end(domain);
             }
 
-
-
+            __itt_task_begin(domain, __itt_null, __itt_null, handle_heartBeating);
+            
             //  Disconnect and delete any expired workers
             //  Send heartbeats to idle workers if needed
             now = std::chrono::system_clock::now();
@@ -382,7 +386,7 @@ public:
                 heartbeat_at += HEARTBEAT_INTERVAL;
                 now = std::chrono::system_clock::now();
             }
-
+            __itt_task_end(domain);
             if (std::chrono::system_clock::now() > start + 1s) {
                 auto part = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::system_clock::now() - start).count();
                 __itt_frame_end_v3(domain, NULL);
