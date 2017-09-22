@@ -120,10 +120,10 @@ public:
                    //  Don't try to handle errors, just assert noisily
                    assert (recv_msg->parts () >= 3);
 
-                   std::basic_string<unsigned char> header = recv_msg->pop_front();
+                   auto header = recv_msg->pop_front();
                    assert (header.compare((unsigned char *)MDPC_CLIENT) == 0);
 
-                   std::basic_string<unsigned char> reply_service = recv_msg->pop_front();
+                   auto reply_service = recv_msg->pop_front();
                    assert (reply_service.compare((unsigned char *)service.c_str()) == 0);
 
                    delete request;

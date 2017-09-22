@@ -153,12 +153,12 @@ public:
                 //  Don't try to handle errors, just assert noisily
                 assert (msg->parts () >= 3);
 
-                std::basic_string<unsigned char> empty = msg->pop_front ();
+                auto empty = msg->pop_front ();
                 assert (empty.compare((unsigned char *)"") == 0);
                 //assert (strcmp (empty, "") == 0);
                 //free (empty);
 
-                std::basic_string<unsigned char> header = msg->pop_front ();
+                auto header = msg->pop_front ();
                 assert (header.compare((unsigned char *)MDPW_WORKER) == 0);
                 //free (header);
 

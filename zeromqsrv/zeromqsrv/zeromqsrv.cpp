@@ -5,7 +5,7 @@
 //     Andreas Hoelzlwimmer <andreas.hoelzlwimmer@fh-hagenberg.at>
 //
 
-#include "router.h"
+#include "router2.h"
 #include <thread>
 
 //  We'd normally pull these from config data
@@ -428,8 +428,8 @@ int main(int argc, char *argv[]) {
     s_catch_signals();
 
 
-    router rt;
-    rt.bind("tcp://127.0.0.1:5555");
+    router2 rt;
+    rt.bind("tcp://192.168.49.232:5555");
     //std::thread ([&rt](){rt.route();}).detach();
     rt.route();
 

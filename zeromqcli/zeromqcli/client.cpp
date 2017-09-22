@@ -23,14 +23,15 @@ void client::connect_to_broker() {
     //No Lingering
     int linger = 0;
     m_worker->setsockopt(ZMQ_LINGER, &linger, sizeof(linger));
-    m_worker->setsockopt(ZMQ_IDENTITY, m_clientID.c_str(), m_clientID.length());
+    m_worker->setsockopt(ZMQ_IDENTITY, m_clientID.c_str(), m_clientID.length()); //#TODO clientID
     //s_set_id(*m_worker, 123);
     m_worker->connect(m_broker.c_str());
     if (m_verbose)
         s_console("I: connecting to broker at %s...", m_broker.c_str());
 
     //  Register rpc service
-    send_to_broker((char*)MDPW_READY, {"123", "rpc"}, NULL);
+
+    send_to_broker((char*)MDPW_READY, {"rpc"}, NULL);
 
     //  If liveness hits zero, queue is considered disconnected
     m_liveness = HEARTBEAT_LIVENESS;

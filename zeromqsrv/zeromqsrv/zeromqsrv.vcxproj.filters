@@ -27,6 +27,9 @@
     <ClInclude Include="router.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="router2.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -36,6 +39,9 @@
       <Filter>Quelldateien</Filter>
     </ClCompile>
     <ClCompile Include="router.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="router2.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>

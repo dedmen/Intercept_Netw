@@ -24,18 +24,25 @@ public:
     //  ---------------------------------------------------------------------
     //  Send message to broker
     //  If no _msg is provided, creates one internally
+    ///Only internal use
     void send_to_broker(char *command, std::vector<std::string> options, std::shared_ptr<zmsg> _msg) {
         std::shared_ptr<zmsg> msg = _msg ? std::make_shared<zmsg>(*_msg) : std::make_shared<zmsg>();
 
         //  Stack protocol envelope to start of message       
         for (auto& option : options)
             if (option.length() != 0) {
-                msg->push_front((char*)option.c_str());
+                msg->push_front(option);
             }
         msg->push_front(command);
-        msg->push_front((char*)MDPW_WORKER);
-        msg->push_front((char*)"");
+        msg->push_front(MDPW_WORKER);
+        msg->push_front("");
 
+        /*
+         * empty
+         * <header>
+         * command
+         * options....
+         */
         if (m_verbose) {
             s_console("I: sending %s to broker",
                 mdps_commands[(int)*command]);
@@ -44,14 +51,37 @@ public:
         msg->send(*m_worker);
     }
 
+    void sendHeartbeat() {
+        std::shared_ptr<zmsg> msg = std::make_shared<zmsg>();
+        msg->push_front(MDPW_HEARTBEAT);
+        msg->push_front("");
+
+        /*
+        * empty
+        * <header> (MDPW_HEARTBEAT)
+        */
+        //if (m_verbose) {
+        //    s_console("ping");
+        //    msg->dump();
+        //}
+        msg->send(*m_worker);
+    }
+
     void send(std::string service, std::shared_ptr<zmsg> request) {
 
         //  Prefix request with protocol frames
         //  Frame 1: "MDPCxy" (six bytes, MDP/Client x.y)
         //  Frame 2: Service name (printable string)
-        request->push_front((char*)service.c_str());
-        request->push_front((char*)MDPC_CLIENT);
-        request->push_front((char*)"");
+        request->push_front(service.c_str());
+        request->push_front(MDPW_REQUEST);
+        request->push_front(MDPW_WORKER);
+        request->push_front("");
+        /*
+         * empty
+         * <header>
+         * <MDPW_REQUEST>
+         * <service name>
+         */
         if (m_verbose) {
             //s_console("I: send request to '%s' service:", service.c_str());
             //request->dump();
@@ -103,27 +133,28 @@ public:
 
                 //  Don't try to handle errors, just assert noisily
                 assert(msg->parts() >= 3);
-
-                std::basic_string<unsigned char> empty = msg->pop_front();
-                assert(empty.compare((unsigned char *)"") == 0);
+                auto empty = msg->pop_front();
+                assert(empty.compare("") == 0);
                 //assert (strcmp (empty, "") == 0);
                 //free (empty);
 
-                std::basic_string<unsigned char> header = msg->pop_front();
+                //auto header = msg->pop_front();
                 //assert(header.compare((unsigned char *)MDPW_WORKER) == 0);
                 //free (header);
 
-                std::string command = (char*)msg->pop_front().c_str();
+                std::string command = msg->pop_front();
                 if (command.compare(MDPW_REQUEST) == 0) {
                     //  We should pop and save as many addresses as there are
                     //  up to a null part, but for now, just save one...
                     m_reply_to = msg->unwrap();
                     return msg;     //  We have a request to process
+                } else if (command.compare(MDPW_REPLY) == 0) {
+                    return msg;
                 } else if (command.compare(MDPW_HEARTBEAT) == 0) {
                     std::cerr << "pong\n";
                     //  Do nothing for heartbeats
                 } else if (command.compare(MDPW_DISCONNECT) == 0) {
-                    connect_to_broker();
+                    connect_to_broker();//I don't know why he disconnected us.. But I want to stay connected!
                 } else {
                     s_console("E: invalid input message (%d)",
                         (int) *(command.c_str()));
@@ -139,16 +170,14 @@ public:
                 }
             //  Send HEARTBEAT if it's time
             if (std::chrono::system_clock::now() >= m_heartbeat_at) {
-                m_verbose = false;
                 std::cerr << "ping\n";
-                send_to_broker((char*)MDPW_HEARTBEAT, { "" }, NULL);
-                m_verbose = true;
+                sendHeartbeat();
                 m_heartbeat_at += m_heartbeat;
             }
         }
         if (s_interrupted)
             printf("W: interrupt received, killing worker...\n");
-        return NULL;
+        return nullptr;
     }
 
 private:

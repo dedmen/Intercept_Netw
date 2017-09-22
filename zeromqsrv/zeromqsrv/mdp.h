@@ -10,7 +10,8 @@
 
 //  This is the version of MDP/Worker we implement
 #define MDPW_WORKER         "MDPW01"
-
+#include <string_view>
+using namespace std::string_view_literals;
 //  MDP/Server commands, as strings
 #define MDPW_READY          "\001"
 #define MDPW_REQUEST        "\002"
