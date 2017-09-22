@@ -41,7 +41,7 @@ int pingperfTest(std::string clientID = "123") {
         std::shared_ptr<zmsg> req = std::make_shared<zmsg>(msg);
         std::chrono::high_resolution_clock::time_point pre = std::chrono::high_resolution_clock::now();
         session.send("srv.echo", req);
-        std::shared_ptr<zmsg> request = session.recv();
+        //std::shared_ptr<zmsg> request = session.recv();
         std::chrono::high_resolution_clock::time_point post = std::chrono::high_resolution_clock::now();
 
         std::chrono::microseconds ping = std::chrono::duration_cast<std::chrono::microseconds>(post-pre);
@@ -68,10 +68,10 @@ int pingperfTest(std::string clientID = "123") {
 }
 
 int main(int argc, char *argv[]) {
-    std::thread([]() {pingperfTest("1553");}).detach();
-    std::thread([]() {pingperfTest("15532");}).detach();
-    std::thread([]() {pingperfTest("15553");}).detach();
-    std::thread([]() {pingperfTest("15753");}).detach();
+    //std::thread([]() {pingperfTest("1553");}).detach();
+    //std::thread([]() {pingperfTest("15532");}).detach();
+    //std::thread([]() {pingperfTest("15553");}).detach();
+    //std::thread([]() {pingperfTest("15753");}).detach();
     std::thread([](){pingperfTest("15543");}).detach();
     pingperfTest("123");
     int verbose = (argc > 1 && strcmp(argv[1], "-v") == 0);

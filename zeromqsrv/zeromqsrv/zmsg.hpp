@@ -8,6 +8,12 @@
 #include <stdarg.h>
 #include <ittnotify.h>
 
+static __itt_domain* zmsg_domain = __itt_domain_create("zmsg");
+static __itt_string_handle* handle_send = __itt_string_handle_create("send");
+static __itt_string_handle* handle_send_rebuild = __itt_string_handle_create("send_rebuild");
+static __itt_string_handle* handle_send_send = __itt_string_handle_create("send_send");
+static __itt_string_handle* handle_send_clear0copy = __itt_string_handle_create("send_clear0copy");
+
 class zmsg {
 public:
     zmsg() {}
@@ -83,10 +89,7 @@ public:
         return true;
     }
 
-    __itt_domain* zmsg_domain = __itt_domain_create("zmsg");
-    __itt_string_handle* handle_send = __itt_string_handle_create("send");
-    __itt_string_handle* handle_send_rebuild = __itt_string_handle_create("send_rebuild");
-    __itt_string_handle* handle_send_send = __itt_string_handle_create("send_send");
+
     void send(zmq::socket_t & socket) {
         __itt_task_begin(zmsg_domain, __itt_null, __itt_null, handle_send);
         for (size_t part_nbr = 0; part_nbr < m_part_data.size(); part_nbr++) {
@@ -100,8 +103,14 @@ public:
             //}
             //else {
             __itt_task_begin(zmsg_domain, __itt_null, __itt_null, handle_send_rebuild);
-            message.rebuild(data.size());
-            memcpy(message.data(), data.c_str(), data.size());
+            auto datHeap = new std::string(std::move(data));
+            //zero-copy move
+            message.rebuild((void*)datHeap->c_str(), datHeap->size(), [](void *data, void *hint)
+            {
+                //__itt_task_begin(zmsg_domain, __itt_null, __itt_null, handle_send_clear0copy);
+                delete ((std::string*)hint);
+                //__itt_task_end(zmsg_domain);
+            }, (void*)datHeap);
             __itt_task_end(zmsg_domain);
             //}
             try {
@@ -113,6 +122,34 @@ public:
             }
         }
         clear();
+        __itt_task_end(zmsg_domain);
+    }
+
+    //This sends like send() does but doesn't clear our internal data. Meaning you can reuse the message and send it to others.
+    void sendKeepAlive(zmq::socket_t & socket) {
+        __itt_task_begin(zmsg_domain, __itt_null, __itt_null, handle_send);
+        for (size_t part_nbr = 0; part_nbr < m_part_data.size(); part_nbr++) {
+            zmq::message_t message;
+            auto& data = m_part_data[part_nbr];
+            //if (data.size() == 33 && data [0] == '@') {
+            //   unsigned char * uuidbin = decode_uuid ((char *) data.c_str());
+            //   message.rebuild(17);
+            //   memcpy(message.data(), uuidbin, 17);
+            //   delete uuidbin;
+            //}
+            //else {
+            __itt_task_begin(zmsg_domain, __itt_null, __itt_null, handle_send_rebuild);
+            memcpy(message.data(), data.c_str(), data.size());
+            __itt_task_end(zmsg_domain);
+            //}
+            try {
+                __itt_task_begin(zmsg_domain, __itt_null, __itt_null, handle_send_send);
+                socket.send(message, part_nbr < m_part_data.size() - 1 ? ZMQ_SNDMORE : 0);
+                __itt_task_end(zmsg_domain);
+            } catch (zmq::error_t error) {
+                assert(error.num() != 0);
+            }
+        }
         __itt_task_end(zmsg_domain);
     }
 
@@ -263,11 +300,19 @@ public:
         push_front(std::move(address));
     }
 
+    void wrap(const char* address, std::string&& delim) {
+        push_front(std::move(delim));
+        push_front(address);
+    }
+    void wrap(std::string&& address, const char* delim) {
+        push_front(delim);
+        push_front(std::move(address));
+    }
     std::string unwrap() {
         if (m_part_data.size() == 0) {
             return NULL;
         }
-        std::string addr = (char*)pop_front().c_str();
+        std::string addr = std::move(pop_front());
         if (address() && *address() == 0) {
             pop_front();
         }

@@ -253,8 +253,12 @@ public:
                     srv->dispatch(msg);
                 else {
                     std::string client = msg->unwrap();
-                    msg->wrap(MDPW_REPLY, service_name);
-                    msg->wrap(client, "");
+                    //These moves prevent a unnecessary copy. But also discard the values making them unusable after the move
+                    //#TODO add a pushFront function that takes a vector. It premoves as many elements as it needs and then moves the data in.
+                    //Instead of move elements -> put data -> move elements -> put data
+                    //vector::insert can already insert a iterator range at the start. I guess it probably does exactly what I need
+                    msg->wrap("\003", std::move(service_name));
+                    msg->wrap(std::move(client), "");
                     /*
                      *<client identifier>
                      *<service name>
