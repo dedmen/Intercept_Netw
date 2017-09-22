@@ -257,7 +257,7 @@ public:
                     //#TODO add a pushFront function that takes a vector. It premoves as many elements as it needs and then moves the data in.
                     //Instead of move elements -> put data -> move elements -> put data
                     //vector::insert can already insert a iterator range at the start. I guess it probably does exactly what I need
-                    msg->wrap("\003", std::move(service_name));
+                    msg->wrap(MDPW_REPLY, std::move(service_name));
                     msg->wrap(std::move(client), "");
                     /*
                      *<client identifier>
